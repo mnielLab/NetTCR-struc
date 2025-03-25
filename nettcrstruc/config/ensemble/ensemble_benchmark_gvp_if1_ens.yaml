@@ -1,0 +1,33 @@
+model_0:
+  state_dict: data/params/gvp_if1_ens_benchmark/model_0_5.pt
+model_1:
+  state_dict: data/params/gvp_if1_ens_benchmark/model_1_5.pt
+model_2:
+  state_dict: data/params/gvp_if1_ens_benchmark/model_2_5.pt
+model_3:
+  state_dict: data/params/gvp_if1_ens_benchmark/model_3_5.pt
+model_4:
+  state_dict: data/params/gvp_if1_ens_benchmark/model_4_5.pt
+model_5:
+  state_dict: data/params/gvp_if1_ens_05_benchmark/model_0_5.pt
+model_6:
+  state_dict: data/params/gvp_if1_ens_05_benchmark/model_1_5.pt
+model_7:
+  state_dict: data/params/gvp_if1_ens_05_benchmark/model_2_5.pt
+model_8:
+  state_dict: data/params/gvp_if1_ens_05_benchmark/model_3_5.pt
+model_9:
+  state_dict: data/params/gvp_if1_ens_05_benchmark/model_4_5.pt
+
+
+defaults: 
+  - model@model_0: GVP
+  - model@model_1: GVP
+  - model@model_2: GVP
+  - model@model_3: GVP
+  - model@model_4: GVP
+  - model@model_5: GVP
+  - model@model_6: GVP
+  - model@model_7: GVP
+  - model@model_8: GVP
+  - model@model_9: GVP

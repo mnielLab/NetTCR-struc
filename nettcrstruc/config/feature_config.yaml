@@ -1,0 +1,4 @@
+node_scalar_features: ["residue_if_encodings"]
+node_vector_features: []
+edge_scalar_features: []
+edge_vector_features: []

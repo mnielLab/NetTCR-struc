@@ -1,0 +1,16 @@
+seed: 0
+num_workers: 8
+overwrite: False
+input_dir: /path/to/structures/
+processed_dir: /path/to/features/
+name: scoring_method_name
+defaults:
+  - _self_  
+  - ensemble: ensemble_name
+  - override hydra/hydra_logging: disabled  
+  - override hydra/job_logging: disabled  
+
+hydra:  
+  output_subdir: null  
+  run:  
+    dir: .
