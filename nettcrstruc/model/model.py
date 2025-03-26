@@ -1,4 +1,3 @@
-# Modified from https://github.com/drorlab/gvp-pytorch/blob/main/gvp/models.py
 import torch
 import torch.nn as nn
 from gvp import GVP, GVPConvLayer, LayerNorm
@@ -7,27 +6,9 @@ from torch_scatter import scatter_mean
 
 class GVPMQA(nn.Module):
     """
+    Modified from https://github.com/drorlab/gvp-pytorch/blob/main/gvp/models.py
+
     GVP-GNN for Model Quality Assessment as described in manuscript.
-
-    Takes in protein structure graphs of type `torch_geometric.data.Data`
-    or `torch_geometric.data.Batch` and returns a scalar score for
-    each graph in the batch in a `torch.Tensor` of shape [n_nodes]
-
-    Should be used with `gvp.data.ProteinGraphDataset`, or with generators
-    of `torch_geometric.data.Batch` objects with the same attributes.
-
-    :param node_in_dim: node dimensions in input graph, should be
-                        (6, 3) if using original features
-    :param node_h_dim: node dimensions to use in GVP-GNN layers
-    :param node_in_dim: edge dimensions in input graph, should be
-                        (32, 1) if using original features
-    :param edge_h_dim: edge dimensions to embed to before use
-                       in GVP-GNN layers
-    :seq_in: if `True`, sequences will also be passed in with
-             the forward pass; otherwise, sequence information
-             is assumed to be part of input node embeddings
-    :param num_layers: number of GVP-GNN layers
-    :param drop_rate: rate to use in all dropout layers
     """
 
     def __init__(

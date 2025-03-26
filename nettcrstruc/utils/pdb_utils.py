@@ -9,9 +9,8 @@ import biotite.structure.io as strucio
 import numpy as np
 import pandas as pd
 from Bio.PDB import Entity, MMCIFParser, PDBParser, Polypeptide
-from tqdm import tqdm
-
 from structure_pipeline.utils.sequence_utils import get_cdr_from_sequence
+from tqdm import tqdm
 
 
 def get_tcr_peptide_clashes_for_structure(

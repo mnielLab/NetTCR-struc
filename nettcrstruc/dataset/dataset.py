@@ -1,5 +1,3 @@
-# Modified from https://github.com/drorlab/gvp-pytorch/blob/main/gvp/data.py
-
 from pathlib import Path
 from typing import Union
 

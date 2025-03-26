@@ -15,7 +15,7 @@ from nettcrstruc.utils.sequence_utils import get_cdr_from_sequence, get_cdr_indi
 
 
 def get_alphafold_rankings(run_dir: Path) -> None:
-    # Get metrics and ranked candidates
+    """Get metrics for an AlphaFold run directory."""
     metrics = pd.read_csv(
         run_dir / "model_scores.txt",
         sep="\t",
@@ -37,11 +37,19 @@ def get_alphafold_rankings(run_dir: Path) -> None:
 
 
 def map_ranking_to_model_order(run_dir: Path) -> None:
+    """Maps ranking to model order."""
     rankings = json.load(open(run_dir / "ranking_debug.json", "r"))["order"]
     return pd.DataFrame({"rank": range(len(rankings)), "order": rankings})
 
 
 def filter_clashes(df, max_tra_clashes=5, max_trb_clashes=5):
+    """Filter structures based on TCR-peptide clashes.
+
+    Args:
+        df (pd.DataFrame): DataFrame with paths for TCR-pMHC structural models.
+        max_tra_clashes (int): Maximum number of TRA clashes allowed.
+        max_trb_clashes (int): Maximum number of TRB clashes allowed.
+    """
     paths = df["path"].tolist()
     with concurrent.futures.ProcessPoolExecutor() as executor:
         results = list(
@@ -70,7 +78,7 @@ def filter_clashes(df, max_tra_clashes=5, max_trb_clashes=5):
     return df
 
 
-def harmonic_mean(series):
+def harmonic_mean(series: list):
     """
     Calculate the harmonic mean of a row-wise operation across multiple pandas Series.
 
@@ -89,21 +97,29 @@ def harmonic_mean(series):
 
 
 def get_plddts_for_run_dir(run_dir: Path) -> pd.DataFrame:
+    """Get pLDDT scores for a run directory.
+
+    Args:
+        run_dir (Path): Path to the run directory.
+
+    Returns:
+        DataFrame: DataFrame with pLDDT scores.
+    """
     # Check if results already exist
     score_file = run_dir / "cdr_peptide_plddt_scores.csv"
     if score_file.exists():
         return pd.read_csv(score_file)
-    
+
     # Find all ranked PDB files
     pdb_files = sorted(run_dir.glob("ranked*pdb"))
     if not pdb_files:
         raise FileNotFoundError(f"No ranked PDB files found in {run_dir}")
-    
+
     # Process the first PDB file
     model_0 = strucio.load_structure(pdb_files[0])
     tra_seq = pdb_utils.get_sequence_from_chain(model_0, "D")
     trb_seq = pdb_utils.get_sequence_from_chain(model_0, "E")
-    
+
     # Extract CDR sequences
     cdrs = [
         get_cdr_from_sequence(tra_seq, 1)[0],
@@ -113,22 +129,24 @@ def get_plddts_for_run_dir(run_dir: Path) -> pd.DataFrame:
         get_cdr_from_sequence(trb_seq, 2)[0],
         get_cdr_from_sequence(trb_seq, 3)[0],
     ]
-    
+
     # Create DataFrame
     df = pd.DataFrame({"path": [str(p) for p in pdb_files]})
     df[["A1", "A2", "A3", "B1", "B2", "B3"]] = cdrs
-    
+
     # Compute pLDDT scores
     df = get_plddt_scores(df.copy(deep=True), 1)
-    
+
     # Save results
-    df = df[[
-        "path",
-        "plddt",
-        "plddt_include_peptide",
-        "plddt_normalized",
-        "plddt_include_peptide_normalized",
-    ]]
+    df = df[
+        [
+            "path",
+            "plddt",
+            "plddt_include_peptide",
+            "plddt_normalized",
+            "plddt_include_peptide_normalized",
+        ]
+    ]
     df.to_csv(score_file, index=False)
     return df
 
@@ -142,17 +160,15 @@ def compute_plddt_sum(
     """Compute summed PLDDT for a CDR.
 
     Args:
-        sequence (str): Amino acid sequence.
-        plddt (np.ndarray): PLDDT scores for a CDR.
-        indices (list): List of indices for CDR.
+        plddt (np.ndarray): PLDDT scores.
+        indices (list): List of lists with CDR indices.
+        eps (float): Epsilon value to prevent division by zero.
+        normalize_on_length (bool): Normalize on the number of CDR-peptide residues.
 
     Returns:
         float: Summed PLDDT scores.
     """
-    plddt_sum = torch.tensor(0.0) + eps
-    for i, cdr_idx in enumerate(indices):
-        for idx in cdr_idx:
-            plddt_sum += plddt[idx]
+    plddt_sum = plddt[indices] + eps
 
     if normalize_on_length:
         plddt_sum /= sum([len(cdr_idx) for cdr_idx in indices])
@@ -162,21 +178,30 @@ def compute_plddt_sum(
 
 def get_plddt_score(
     structure: struc.AtomArray,
-    a1,
-    a2,
-    a3,
-    b1,
-    b2,
-    b3,
+    a1: str,
+    a2: str,
+    a3: str,
+    b1: str,
+    b2: str,
+    b3: str,
     top_k: int,
-    normalize_on_length=False,
+    normalize_on_length: bool = True,
     include_peptide: bool = False,
 ) -> list:
-    """Score TCRs based on PLDDT score.
+    """Gets pLDDT scores for CDR123ab-peptide residues.
 
     Args:
-        df (pd.DataFrame): Dataframe with TCRs.
-        data_dir (Path): Path to structure model directory.
+        structure: struc.AtomArray with pLDDT attribute.
+        a1: string for CDR1a sequence.
+        a2: string for CDR2a sequence.
+        a3: string for CDR3a sequence.
+        b1: string for CDR1b sequence.
+        b2: string for CDR2b sequence.
+        b3: string for CDR3b sequence.
+        top_k: Number of top models to consider.
+        normalize_on_length: Normalize on the number of residues.
+        include_peptide: Include peptide residues in the calculation.
+
 
     Returns:
         list: List of PLDDT scores.
@@ -248,9 +273,6 @@ def get_plddt_scores(
     top_k: int,
 ) -> pd.DataFrame:
     """Get PLDDT scores for a dataframe of TCRs."""
-
-    plddt = []
-    plddt_include_peptide = []
     plddt_normalized = []
     plddt_include_peptide_normalized = []
 
@@ -258,34 +280,6 @@ def get_plddt_scores(
         ["path", "A1", "A2", "A3", "B1", "B2", "B3"]
     ].values:
         structure = strucio.load_structure(path, extra_fields=["b_factor"])
-        plddt.append(
-            get_plddt_score(
-                structure,
-                a1,
-                a2,
-                a3,
-                b1,
-                b2,
-                b3,
-                top_k,
-                normalize_on_length=False,
-                include_peptide=False,
-            )
-        )
-        plddt_include_peptide.append(
-            get_plddt_score(
-                structure,
-                a1,
-                a2,
-                a3,
-                b1,
-                b2,
-                b3,
-                top_k,
-                normalize_on_length=False,
-                include_peptide=True,
-            )
-        )
         plddt_normalized.append(
             get_plddt_score(
                 structure,
@@ -314,15 +308,11 @@ def get_plddt_scores(
                 include_peptide=True,
             )
         )
-    df["plddt"] = plddt
-    df["plddt_include_peptide"] = plddt_include_peptide
     df["plddt_normalized"] = plddt_normalized
     df["plddt_include_peptide_normalized"] = plddt_include_peptide_normalized
     return df[
         [
             "path",
-            "plddt",
-            "plddt_include_peptide",
             "plddt_normalized",
             "plddt_include_peptide_normalized",
         ]

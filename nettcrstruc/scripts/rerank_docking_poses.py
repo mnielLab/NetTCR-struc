@@ -83,16 +83,13 @@ def rerank_candidates(
         assert len(y_pred) == len(scores)
         predicted_scores.append(torch.stack(y_pred).cpu().numpy())
 
-
     # Rerank candidates using predicted scores
     for i in range(len(predicted_scores)):
         scores[f"pred_{i}"] = predicted_scores[i]
-    scores["predicted_dockq_1"] = scores[
-        [f"pred_{i}" for i in range(5)] 
-    ].mean(axis=1)
-    scores["predicted_dockq_2"] = scores[
-        [f"pred_{i}" for i in range(5, 10)]
-    ].mean(axis=1)
+    scores["predicted_dockq_1"] = scores[[f"pred_{i}" for i in range(5)]].mean(axis=1)
+    scores["predicted_dockq_2"] = scores[[f"pred_{i}" for i in range(5, 10)]].mean(
+        axis=1
+    )
     scores["quality_score"] = harmonic_mean(
         [
             scores["predicted_dockq_1"],
@@ -112,7 +109,10 @@ def main(config: DictConfig):
     model_list = []
     for model_config in config.ensemble:
         model = hydra.utils.instantiate(config.ensemble[model_config].model)
-        model_path = Path(__file__).resolve().parent.parent / config.ensemble[model_config].state_dict
+        model_path = (
+            Path(__file__).resolve().parent.parent
+            / config.ensemble[model_config].state_dict
+        )
         model.load_state_dict(torch.load(model_path))
         model.to(device)
         model_list.append(model)
