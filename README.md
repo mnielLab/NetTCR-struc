@@ -16,7 +16,7 @@ We provide 2 ensembles of models as described in the manuscript:
 - GVP-ens-binding
 - GVP-IF1-ens-binding
 
-Additionally, we also provide models trained on data excluding targets in docking scoring benchmark data:
+Additionally, we provide models trained on data excluding targets in docking scoring benchmark data:
 
 - GVP-ens-benchmark 
 - GVP-IF1-ens-benchmark 
@@ -41,10 +41,10 @@ Additionally, we also provide models trained on data excluding targets in dockin
 
 ## Usage
 
-1. Featurize structural models. Assumes chains follow the naming convention D = TCRa, E = TCRb, C = peptide, A = MHCa B = MHCb
+1. Featurize structural models. Provide chain names with the argument --chain_names in the order TCRa, TCRb, peptide, MHCa, MHCb.
 
 ```bash
-python3 create_geometric_features.py -i <path to directory of modeling runs> -o <path to output directory> -n 2 -d cuda
+python3 create_geometric_features.py -i <path to directory of modeling runs> -o <path to output directory> -n 2 -d cuda --chain_names D E C A B
 ```
 
 This will create 3 directories in the specified output directory:
@@ -55,14 +55,14 @@ This will create 3 directories in the specified output directory:
 
 Use the features in "gvp" for GVP-ens ensembles and "gvp_if1_embeddings" for GVP-IF-ens ensembles.
 
-2. Score structural models with a GNN ensemble. The script assumes that in each model run directory, a file model_scores.txt exists, where the first column is AlphaFold-M confidence scores for each structural model. Additionally, .pdb files for each model must contain a B-factor column that contains pLDDT scores for each residue.
+2. Score structural models with a GNN ensemble. The script assumes that in each model run directory, a file model_scores.txt that has columns "name" and "confidence", which describe the name (without suffix) of each .pdb file in the run directory and its AlphaFold confidence. Additionally, .pdb files for each model must contain a B-factor column that contains pLDDT scores for each residue. If chain names differ from the expected naming of D, E, C, A, B, they must be provided as the chain_names argument.
 
 ```bash
-python3 rerank_docking_poses.py input_dir=<path to directory of modeling runs> processed_dir=<path to feature directory> name=<name for this scoring run> ensemble=ensemble_binding_gvp_if1_ens
+python3 rerank_docking_poses.py input_dir=<path to directory of modeling runs> processed_dir=<path to feature directory> name=<name for this scoring run> ensemble=ensemble_binding_gvp_if1_ens chain_names=[D,E,C,A,B]
 ```
 
-This creates a file with rescore_<name>.csv in each modeling run directory of <input_dir>, that contains predicted model quality scores. The combined GNN and AlphaFold quality score we describe in the manuscript, termed GNN-AF or GNN-IF1-AF, is found in the quality_score column.
+This creates a file named rescore_<name>.csv in each modeling run directory of <input_dir>, that contains predicted model quality scores. The combined GNN and AlphaFold quality score we describe in the manuscript, termed GNN-AF or GNN-IF1-AF, is found in the quality_score column.
 
 ## License
 
-NetTCR-struc was developed by the Health Tech section at Technical University of Denmark (DTU). The code and data can be used freely by academic groups for non-commercial purposes. If you plan to use these tools for any for-profit application, you are required to obtain a separate license (contact Morten Nielsen, morni@dtu.dk).
+NetTCR-struc was developed by the Health Tech section at Technical University of Denmark (DTU). The code and data can be used freely by academic groups for non-commercial purposes. If you plan to use these tools for any for-profit application, you are required to obtain a separate license (contact Morten Nielsen, morni@dtu.dk). Licensed under Creative Commons ”Attribution-NonCommercial-NoDerivs 2.0 Generic License”.
