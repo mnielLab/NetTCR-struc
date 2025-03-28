@@ -31,7 +31,7 @@ Additionally, we provide models trained on data excluding targets in docking sco
 2. Navigate to the project directory:
 
    ```bash
-   cd your-repo-name
+   cd NetTCR-struc
    ```
 3. Install dependencies:
 
@@ -39,29 +39,52 @@ Additionally, we provide models trained on data excluding targets in docking sco
    conda env create -f environment.yml 
    ```
 
-## Usage
+## Usage  
 
-1. Featurize structural models. Provide chain names with the argument --chain_names in the order TCRa, TCRb, peptide, MHCa, MHCb.
+### 1. Featurize Structural Models 
 
-```bash
-python3 create_geometric_features.py -i <path to directory of modeling runs> -o <path to output directory> -n 2 -d cuda --chain_names D E C A B
-```
-
-This will create 3 directories in the specified output directory:
-
-- esm_if1_embeddings
-- gvp
-- gvp_if1_embeddings
-
-Use the features in "gvp" for GVP-ens ensembles and "gvp_if1_embeddings" for GVP-IF-ens ensembles.
-
-2. Score structural models with a GNN ensemble. The script assumes that in each model run directory, a file model_scores.txt that has columns "name" and "confidence", which describe the name (without suffix) of each .pdb file in the run directory and its AlphaFold confidence. Additionally, .pdb files for each model must contain a B-factor column that contains pLDDT scores for each residue. If chain names differ from the expected naming of D, E, C, A, B, they must be provided as the chain_names argument.
+Use `create_geometric_features.py` to extract geometric features from structural models. Specify chain names using `--chain_names` in the order: **TCRα, TCRβ, peptide, MHCa, MHCb**.  
 
 ```bash
-python3 rerank_docking_poses.py input_dir=<path to directory of modeling runs> processed_dir=<path to feature directory> name=<name for this scoring run> ensemble=ensemble_binding_gvp_if1_ens chain_names=[D,E,C,A,B]
+python3 create_geometric_features.py -i <path_to_modeling_runs> -o <output_directory> -n 2 -d cuda --chain_names D E C A B
 ```
 
-This creates a file named rescore_<name>.csv in each modeling run directory of <input_dir>, that contains predicted model quality scores. The combined GNN and AlphaFold quality score we describe in the manuscript, termed GNN-AF or GNN-IF1-AF, is found in the quality_score column.
+This generates three directories in the output directory:  
+
+- `esm_if1_embeddings`
+- `gvp`
+- `gvp_if1_embeddings`
+
+Use features from:  
+
+- `gvp` for **GVP-ens ensembles**  
+- `gvp_if1_embeddings` for **GVP-IF-ens ensembles**  
+
+---
+
+### 2. Score Structural Models with a GNN Ensemble  
+
+Run `rerank_docking_poses.py` to score models using a **GNN ensemble**. See `nettcrstruc/config/ensemble/` for available ensembles.
+
+#### **Requirements:**  
+
+- Each **modeling run directory** must contain a `model_scores.txt` file with:  
+    - **name**: The PDB filename (without suffix)  
+    - **confidence**: AlphaFold confidence score  
+- Each `.pdb` file must include a **B-factor column** with per-residue **pLDDT scores**.  
+- If chain names differ from `D, E, C, A, B`, specify them using `chain_names`.  
+
+```bash
+python3 rerank_docking_poses.py input_dir=<path_to_modeling_runs> \
+    processed_dir=<path_to_feature_directory> \
+    name=<scoring_run_name> \
+    ensemble=ensemble_binding_gvp_if1_ens \
+    chain_names=[D,E,C,A,B]
+```
+
+This generates `rescore_{name}.csv` in each **modeling run directory** within `<input_dir>`, containing predicted model quality scores.  
+
+- The **GNN-AF** or **GNN-IF1-AF** score (described in our manuscript) is stored in the `quality_score` column.
 
 ## License
 
