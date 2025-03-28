@@ -15,12 +15,14 @@ from nettcrstruc.utils import pdb_utils
 
 def extract_features_from_pdb(
     pdb_path: Path,
+    chain_names: list = ["D", "E", "C", "A", "B"],
     chain_order=["D", "E", "C", "A"],
 ) -> tuple:
     """Extracts relevant information from a PDB file for graph featurization.
 
     Args:
         pdb_path: Path to PDB file.
+        chain_names: Chain names in the PDB file in the order TCRa, TCRb, peptide, MHCa, MHCb.
         chain_order: Order that chains of structure should appear in.
 
     Returns:
@@ -30,6 +32,11 @@ def extract_features_from_pdb(
     """
     # Fetch structure data
     structure = strucio.load_structure(pdb_path, extra_fields=["b_factor"])
+
+    # Rename chains if needed
+    structure = pdb_utils.rename_chains(
+        structure, {k: v for k, v in zip(chain_names, ["D", "E", "C", "A", "B"])}
+    )
 
     # Merge MHC class II B chain to A
     structure = pdb_utils.merge_mhc_chains(structure)
@@ -64,7 +71,6 @@ def extract_features_from_pdb(
 
 def get_geometric_features(
     feature_path: Path,
-    name: str,
     device: str,
     seq: str,
     chain_id: np.ndarray,
@@ -74,7 +80,6 @@ def get_geometric_features(
 
     Args:
         feature_path: Path to save/load features.
-        name: Name of entry.
         device: If "cuda", preprocessing is performed on the GPU.
         seq: Amino acid sequence.
         chain_id: Chain ID for each residue.
@@ -87,7 +92,6 @@ def get_geometric_features(
         features = torch.load(feature_path, map_location=torch.device(device))
     else:
         features = featurize_as_graph(
-            name=name,
             seq=seq,
             coords=coords,
             chain_id=chain_id,
@@ -103,7 +107,6 @@ def get_geometric_features(
 
 
 def featurize_as_graph(
-    name: str,
     seq: str,
     coords: np.ndarray,
     chain_id: np.ndarray,
@@ -119,7 +122,6 @@ def featurize_as_graph(
     Transforms JSON/dictionary-style protein structures into featurized graphs.
 
     Args:
-        name: Name of entry.
         seq: Amino acid sequence.
         coords: Array with coordinates of N, Ca, C, and O atoms.
         chain_id: Chain ID for each residue.
@@ -130,16 +132,7 @@ def featurize_as_graph(
         letter_to_num: Mapping of amino acid letters to integers.
         chain_to_num: Mapping of chain identifiers to integers.
 
-    Returns Data object with:
-        x: Alpha carbon coordinates, shape [n_nodes, 3].
-        seq: Sequence converted to an integer tensor using `self.letter_to_num`, shape [n_nodes].
-        name: Name of the protein structure.
-        node_s: Node scalar features, shape [n_nodes, 6].
-        node_v: Node vector features, shape [n_nodes, 3, 3].
-        edge_s: Edge scalar features, shape [n_edges, 32].
-        edge_v: Edge vector features, shape [n_edges, 1, 3].
-        edge_index: Edge indices, shape [2, n_edges].
-        mask: Node mask, where `False` indicates missing data excluded from message passing.
+    Returns torch_geometric.data.Data object with geometric features.
     """
     with torch.no_grad():
         coords = torch.as_tensor(coords, device=device, dtype=torch.float32)
@@ -183,7 +176,6 @@ def featurize_as_graph(
         x=X_ca,
         seq=seq,
         chain_id=chain_id,
-        name=name,
         node_s=node_s,
         node_v=node_v,
         edge_s=edge_s,

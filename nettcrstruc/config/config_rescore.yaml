@@ -4,6 +4,7 @@ overwrite: False
 input_dir: /path/to/structures/
 processed_dir: /path/to/features/
 name: scoring_method_name
+chain_names: [D,E,C,A,B]
 defaults:
   - _self_  
   - ensemble: ensemble_name

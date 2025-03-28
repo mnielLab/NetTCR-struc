@@ -16,7 +16,7 @@ from nettcrstruc.dataset.processing import (
     extract_features_from_pdb,
     get_geometric_features,
 )
-from nettcrstruc.utils.utils import create_df_from_dir
+from nettcrstruc.utils.utils import get_paths_from_dir
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,16 +54,38 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="cuda",
     )
+    parser.add_argument(
+        "--chain_names",
+        type=list,
+        default=["D", "E", "C", "A", "B"],
+        nargs="+",
+    )
     return parser.parse_args()
+
+
+def mk_feature_dir(pdb_path: Path, out_dir: Path) -> Path:
+    """Create a feature dir for a modeling run dir.
+
+    Args:
+        pdb_path: Path to the PDB file.
+        out_dir: The output directory.
+
+    Returns:
+        Path to the feature directory.
+    """
+    out_dir.mkdir(exist_ok=True)
+    feature_dir = out_dir / pdb_path.parent.stem
+    feature_dir.mkdir(exist_ok=True)
+    return feature_dir
 
 
 def process_entry(
     pdb_path: Path,
     out_dir: Path,
-    name: str,
     device: str,
     esm_if1_model: Any,
     alphabet: Any,
+    chain_names: list,
 ):
     """Process a single entry.
 
@@ -75,21 +97,28 @@ def process_entry(
         esm_if1_model: The ESM-IF1 model used for computation.
         alphabet: Alphabet for the ESM-IF1 model.
     """
-    sequence, chain_id, backbone_coords, structure = extract_features_from_pdb(pdb_path)
+    esm_if1_embeddings_dir = mk_feature_dir(pdb_path, out_dir / "esm_if1_embeddings")
+    gvp_dir = mk_feature_dir(pdb_path, out_dir / "gvp")
+    gvp_if1_dir = mk_feature_dir(pdb_path, out_dir / "gvp_if1_embeddings")
+
+    sequence, chain_id, backbone_coords, structure = extract_features_from_pdb(
+        pdb_path,
+        chain_names,
+    )
 
     # Skip processing if file exists and overwrite is False
+    file_name = f"{Path(pdb_path.stem)}.pt"
     esm_f1_features = get_esm_if1_features(
         structure=structure,
         pdb_path=pdb_path,
         chain_id=chain_id,
-        feature_path=out_dir / "esm_if1_embeddings" / f"{name}.pt",
+        feature_path=esm_if1_embeddings_dir / file_name,
         esm_if1_model=esm_if1_model,
         alphabet=alphabet,
         device=device,
     )
     geoemtric_features = get_geometric_features(
-        feature_path=out_dir / "gvp" / f"{name}.pt",
-        name=name,
+        feature_path=gvp_dir / file_name,
         seq=sequence,
         coords=backbone_coords,
         chain_id=chain_id,
@@ -102,13 +131,14 @@ def process_entry(
         ),
         dim=-1,
     )
-    torch.save(geoemtric_features, out_dir / "gvp_if1_embeddings" / f"{name}.pt")
+    torch.save(geoemtric_features, gvp_if1_dir / file_name)
 
 
 def process_batch(
     batch: list,
     out_dir: Path,
     device: str,
+    chain_names: list,
 ) -> str:
     """Process a batch of entries.
 
@@ -116,6 +146,7 @@ def process_batch(
         batch: A list of tuples with the name and path to the PDB file.
         out_dir: The output directory.
         device: The device to use for computation.
+        chain_names: list of chain identifiers, in the order TCRa, TCRb, peptide, MHCa, MHCb.
 
     Returns:
         A list of results from processing each row in the batch.
@@ -123,32 +154,28 @@ def process_batch(
     esm_if1_model, alphabet = initialize_esm_if1_model(device)
 
     results = []
-    for name, pdb_path in tqdm(batch):
+    for pdb_path in tqdm(batch):
         result = process_entry(
-            pdb_path=pdb_path,
-            name=name,
+            pdb_path=Path(pdb_path),
             out_dir=out_dir,
             device=device,
             esm_if1_model=esm_if1_model,
             alphabet=alphabet,
+            chain_names=chain_names,
         )
         results.append(result)
 
 
 def main() -> None:
-    """Main entry point for GVP data preprocessing."""
     args = parse_args()
-    (args.out_dir / "esm_if1_embeddings").mkdir(parents=True, exist_ok=True)
-    (args.out_dir / "gvp").mkdir(parents=True, exist_ok=True)
-    (args.out_dir / "gvp_if1_embeddings").mkdir(parents=True, exist_ok=True)
+    args.out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.input_csv:
-        df = pd.read_csv(args.input_csv)
+        paths = pd.read_csv(args.input_csv)["path"].values
     else:
-        df = create_df_from_dir(args.input_dir)
-    rows = df[["name", "path"]].values
+        paths = get_paths_from_dir(args.input_dir)
 
-    batches = np.array_split(rows, args.num_workers)
+    batches = np.array_split(paths, args.num_workers)
 
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=args.num_workers
@@ -159,13 +186,10 @@ def main() -> None:
                 batch,
                 args.out_dir,
                 args.device,
+                args.chain_names,
             ): batch
             for batch in batches
         }
-
-        results = []
-        for future in concurrent.futures.as_completed(future_to_batch):
-            results.extend(future.result())
 
 
 if __name__ == "__main__":

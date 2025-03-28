@@ -19,27 +19,16 @@ def get_alphafold_rankings(run_dir: Path) -> None:
     metrics = pd.read_csv(
         run_dir / "model_scores.txt",
         sep="\t",
-        names=["conf", "pLDDT", "pTM", "ipTM"],
+        names=["name", "conf"],
     )
     if metrics.isnull().values.any():
         metrics = pd.read_csv(
             run_dir / "model_scores.txt",
             sep=",",
-            names=["conf", "pLDDT", "pTM", "ipTM"],
+            names=["name", "conf"],
         )
 
-    # Map ranked candidates to metrics
-    metrics["path"] = [
-        str(run_dir / f"ranked_{i}.pdb")
-        for i in range(len(list(run_dir.glob("ranked_*.pdb"))))
-    ]
     return metrics
-
-
-def map_ranking_to_model_order(run_dir: Path) -> None:
-    """Maps ranking to model order."""
-    rankings = json.load(open(run_dir / "ranking_debug.json", "r"))["order"]
-    return pd.DataFrame({"rank": range(len(rankings)), "order": rankings})
 
 
 def filter_clashes(df, max_tra_clashes=5, max_trb_clashes=5):
@@ -96,66 +85,10 @@ def harmonic_mean(series: list):
     return len(series) / np.sum(1.0 / data, axis=1)
 
 
-def get_plddts_for_run_dir(run_dir: Path) -> pd.DataFrame:
-    """Get pLDDT scores for a run directory.
-
-    Args:
-        run_dir (Path): Path to the run directory.
-
-    Returns:
-        DataFrame: DataFrame with pLDDT scores.
-    """
-    # Check if results already exist
-    score_file = run_dir / "cdr_peptide_plddt_scores.csv"
-    if score_file.exists():
-        return pd.read_csv(score_file)
-
-    # Find all ranked PDB files
-    pdb_files = sorted(run_dir.glob("ranked*pdb"))
-    if not pdb_files:
-        raise FileNotFoundError(f"No ranked PDB files found in {run_dir}")
-
-    # Process the first PDB file
-    model_0 = strucio.load_structure(pdb_files[0])
-    tra_seq = pdb_utils.get_sequence_from_chain(model_0, "D")
-    trb_seq = pdb_utils.get_sequence_from_chain(model_0, "E")
-
-    # Extract CDR sequences
-    cdrs = [
-        get_cdr_from_sequence(tra_seq, 1)[0],
-        get_cdr_from_sequence(tra_seq, 2)[0],
-        get_cdr_from_sequence(tra_seq, 3)[0],
-        get_cdr_from_sequence(trb_seq, 1)[0],
-        get_cdr_from_sequence(trb_seq, 2)[0],
-        get_cdr_from_sequence(trb_seq, 3)[0],
-    ]
-
-    # Create DataFrame
-    df = pd.DataFrame({"path": [str(p) for p in pdb_files]})
-    df[["A1", "A2", "A3", "B1", "B2", "B3"]] = cdrs
-
-    # Compute pLDDT scores
-    df = get_plddt_scores(df.copy(deep=True), 1)
-
-    # Save results
-    df = df[
-        [
-            "path",
-            "plddt",
-            "plddt_include_peptide",
-            "plddt_normalized",
-            "plddt_include_peptide_normalized",
-        ]
-    ]
-    df.to_csv(score_file, index=False)
-    return df
-
-
 def compute_plddt_sum(
     plddt: np.ndarray,
     indices: list,
     eps: float = 1e-6,
-    normalize_on_length: bool = False,
 ) -> float:
     """Compute summed PLDDT for a CDR.
 
@@ -163,17 +96,12 @@ def compute_plddt_sum(
         plddt (np.ndarray): PLDDT scores.
         indices (list): List of lists with CDR indices.
         eps (float): Epsilon value to prevent division by zero.
-        normalize_on_length (bool): Normalize on the number of CDR-peptide residues.
 
     Returns:
         float: Summed PLDDT scores.
     """
-    plddt_sum = plddt[indices] + eps
-
-    if normalize_on_length:
-        plddt_sum /= sum([len(cdr_idx) for cdr_idx in indices])
-
-    return plddt_sum.item() * 0.01
+    indices = np.concatenate(indices)
+    return ((plddt[indices].sum() + eps) / len(indices)) * 0.01
 
 
 def get_plddt_score(
@@ -185,8 +113,8 @@ def get_plddt_score(
     b2: str,
     b3: str,
     top_k: int,
-    normalize_on_length: bool = True,
     include_peptide: bool = False,
+    chain_names: list = ["D", "E", "C", "A"],
 ) -> list:
     """Gets pLDDT scores for CDR123ab-peptide residues.
 
@@ -201,6 +129,7 @@ def get_plddt_score(
         top_k: Number of top models to consider.
         normalize_on_length: Normalize on the number of residues.
         include_peptide: Include peptide residues in the calculation.
+        chain_names: List of chain names in the PDB file in the order TCRa, TCRb, peptide, MHC.
 
 
     Returns:
@@ -213,23 +142,23 @@ def get_plddt_score(
 
     # Get peptide indices
     if include_peptide:
-        peptide_plddt = structure[structure.chain_id == "C"].b_factor
+        peptide_plddt = structure[structure.chain_id == chain_names[2]].b_factor
         tra_peptide_indices = [
             np.arange(
-                len(structure[structure.chain_id == "D"]),
-                len(structure[structure.chain_id == "D"])
-                + len(structure[structure.chain_id == "C"]),
+                len(structure[structure.chain_id == chain_names[0]]),
+                len(structure[structure.chain_id == chain_names[0]])
+                + len(structure[structure.chain_id == chain_names[2]]),
             )
         ]
         trb_peptide_indices = [
             np.arange(
-                len(structure[structure.chain_id == "E"]),
-                len(structure[structure.chain_id == "E"])
-                + len(structure[structure.chain_id == "C"]),
+                len(structure[structure.chain_id == chain_names[1]]),
+                len(structure[structure.chain_id == chain_names[1]])
+                + len(structure[structure.chain_id == chain_names[2]]),
             )
         ]
     else:
-        peptide_plddt = np.zeros(len(structure[structure.chain_id == "C"]))
+        peptide_plddt = np.zeros(len(structure[structure.chain_id == chain_names[2]]))
         tra_peptide_indices = []
         trb_peptide_indices = []
 
@@ -237,33 +166,31 @@ def get_plddt_score(
     plddt_sum = compute_plddt_sum(
         plddt=np.concatenate(
             [
-                structure[structure.chain_id == "D"].b_factor,
+                structure[structure.chain_id == chain_names[0]].b_factor,
                 peptide_plddt,
             ]
         ),
         indices=get_cdr_indices(
-            pdb_utils.get_sequence_from_chain(structure, "D"),
+            pdb_utils.get_sequence_from_chain(structure, chain_names[0]),
             a1,
             a2,
             a3,
         )
         + tra_peptide_indices,
-        normalize_on_length=normalize_on_length,
     ) + compute_plddt_sum(
         plddt=np.concatenate(
             [
-                structure[structure.chain_id == "E"].b_factor,
+                structure[structure.chain_id == chain_names[1]].b_factor,
                 peptide_plddt,
             ]
         ),
         indices=get_cdr_indices(
-            pdb_utils.get_sequence_from_chain(structure, "E"),
+            pdb_utils.get_sequence_from_chain(structure, chain_names[1]),
             b1,
             b2,
             b3,
         )
         + trb_peptide_indices,
-        normalize_on_length=normalize_on_length,
     )
     return plddt_sum / 2  # Average over TRA and TRB
 
@@ -271,8 +198,18 @@ def get_plddt_score(
 def get_plddt_scores(
     df: pd.DataFrame,
     top_k: int,
+    chain_names: list = ["D", "E", "C", "A"],
 ) -> pd.DataFrame:
-    """Get PLDDT scores for a dataframe of TCRs."""
+    """Get PLDDT scores for a dataframe of TCRs.
+
+    Args:
+        df (pd.DataFrame): DataFrame with paths and CDR sequences.
+        top_k (int): Number of top models to consider.
+        chain_names (list): List of chain names in the PDB file in the order TCRa, TCRb, peptide, MHC.
+
+    Returns:
+        pd.DataFrame: DataFrame with pLDDT scores.
+    """
     plddt_normalized = []
     plddt_include_peptide_normalized = []
 
@@ -290,8 +227,8 @@ def get_plddt_scores(
                 b2,
                 b3,
                 top_k,
-                normalize_on_length=True,
                 include_peptide=False,
+                chain_names=chain_names,
             )
         )
         plddt_include_peptide_normalized.append(
@@ -304,16 +241,74 @@ def get_plddt_scores(
                 b2,
                 b3,
                 top_k,
-                normalize_on_length=True,
                 include_peptide=True,
+                chain_names=chain_names,
             )
         )
-    df["plddt_normalized"] = plddt_normalized
-    df["plddt_include_peptide_normalized"] = plddt_include_peptide_normalized
+    df["cdr123_plddt"] = plddt_normalized
+    df["cdr123_peptide_plddt"] = plddt_include_peptide_normalized
     return df[
         [
             "path",
-            "plddt_normalized",
-            "plddt_include_peptide_normalized",
+            "cdr123_plddt",
+            "cdr123_peptide_plddt",
         ]
     ]
+
+
+def get_plddts_for_run_dir(
+    run_dir: Path, chain_names: list = ["D", "E", "C", "A"]
+) -> pd.DataFrame:
+    """Get pLDDT scores for a run directory.
+
+    Args:
+        run_dir (Path): Path to the run directory.
+        chain_names (list): List of chain names in the PDB file in the order TCRa, TCRb, peptide, MHC.
+
+    Returns:
+        DataFrame: DataFrame with pLDDT scores.
+    """
+    # Check if results already exist
+    score_file = run_dir / "cdr_peptide_plddt_scores.csv"
+    if score_file.exists():
+        print(f"Loading pLDDT scores from {score_file}")
+        return pd.read_csv(score_file)
+
+    # Find all ranked PDB files
+    pdb_files = sorted(run_dir.glob("*.pdb"))
+    if not pdb_files:
+        raise FileNotFoundError(f"No ranked PDB files found in {run_dir}")
+
+    # Process the first PDB file
+    model_0 = strucio.load_structure(pdb_files[0])
+    tra_seq = pdb_utils.get_sequence_from_chain(model_0, chain_names[0])
+    trb_seq = pdb_utils.get_sequence_from_chain(model_0, chain_names[1])
+
+    # Extract CDR sequences
+    cdrs = [
+        get_cdr_from_sequence(tra_seq, 1)[0],
+        get_cdr_from_sequence(tra_seq, 2)[0],
+        get_cdr_from_sequence(tra_seq, 3)[0],
+        get_cdr_from_sequence(trb_seq, 1)[0],
+        get_cdr_from_sequence(trb_seq, 2)[0],
+        get_cdr_from_sequence(trb_seq, 3)[0],
+    ]
+
+    # Create DataFrame
+    df = pd.DataFrame({"path": [str(p) for p in pdb_files]})
+    df[["A1", "A2", "A3", "B1", "B2", "B3"]] = cdrs
+
+    # Compute pLDDT scores
+    df = get_plddt_scores(df.copy(deep=True), 1, chain_names)
+
+    # Save results
+    df["name"] = df["path"].apply(lambda x: Path(x).stem)
+    df = df[
+        [
+            "name",
+            "cdr123_plddt",
+            "cdr123_peptide_plddt",
+        ]
+    ]
+    df.to_csv(score_file, index=False)
+    return df

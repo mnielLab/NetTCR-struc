@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import hydra
+import pandas as pd
 import torch
 from omegaconf import DictConfig, OmegaConf
 from torch_geometric.data import DataLoader
@@ -40,6 +41,38 @@ def infer(
     return pred
 
 
+def init_dataloader(
+    run_dir: Path,
+    feature_dir: Path,
+    num_workers: int,
+) -> tuple:
+    """Initialize a DataLoader for a run directory.
+
+    Args:
+        run_dir (Path): Path to the run directory.
+        feature_dir (Path): Path to the directory with features.
+        num_workers (int): Number of workers to use for DataLoader.
+
+    Returns:
+        list: List of feature files.
+        DataLoader: DataLoader for the dataset.
+    """
+    feature_files = [
+        feature_dir / run_dir.stem / f"{p.stem}.pt" for p in run_dir.glob("*.pdb")
+    ]
+    dataset = MQAInferenceDataset(
+        feature_file_list=feature_files,
+    )
+    dataloader = DataLoader(
+        dataset,
+        batch_size=len(feature_files) if len(feature_files) < 64 else 64,
+        shuffle=False,
+        num_workers=num_workers,
+        persistent_workers=True,
+    )
+    return feature_files, dataloader
+
+
 def rerank_candidates(
     run_dir: Path,
     model_list: list,
@@ -47,64 +80,77 @@ def rerank_candidates(
     num_workers: int,
     device: torch.device,
     name: str = None,
+    chain_names: list = ["D", "E", "C", "A"],
 ) -> None:
     """Rerank a set of AlphaFold docking poses.
 
     Args:
         run_dir (Path): Path to the run directory.
         model_list (list): List of models to use for reranking.
+        feature_dir (Path): Path to the directory with features.
         num_workers (int): Number of workers to use for DataLoader.
         device (torch.device): Device to use for inference.
         name: Name of the rescoring method.
+        chain_names: Chain names in the PDB file in the order TCRa, TCRb, peptide, MHCa, MHCb.
     """
-    scores = get_alphafold_rankings(run_dir)
-    scores = scores.merge(get_plddts_for_run_dir(run_dir), on="path")
 
-    feature_files = [
-        feature_dir / f"{run_dir.stem}_ranked_{Path(p).stem.split('_')[-1]}.pt"
-        for p in scores["path"]
-    ]
-
-    dataset = MQAInferenceDataset(
-        feature_file_list=feature_files,
-    )
-    dataloader = DataLoader(
-        dataset,
-        batch_size=len(scores),
-        shuffle=False,
+    feature_files, dataloader = init_dataloader(
+        run_dir=run_dir,
+        feature_dir=feature_dir,
         num_workers=num_workers,
-        persistent_workers=True,
     )
 
     predicted_scores = []
     for model in model_list:
         model.eval()
         y_pred = infer(model, dataloader, device)
-        assert len(y_pred) == len(scores)
         predicted_scores.append(torch.stack(y_pred).cpu().numpy())
 
     # Rerank candidates using predicted scores
+    scores = pd.DataFrame([p.stem for p in feature_files], columns=["name"])
     for i in range(len(predicted_scores)):
         scores[f"pred_{i}"] = predicted_scores[i]
     scores["predicted_dockq_1"] = scores[[f"pred_{i}" for i in range(5)]].mean(axis=1)
     scores["predicted_dockq_2"] = scores[[f"pred_{i}" for i in range(5, 10)]].mean(
         axis=1
     )
-    scores["quality_score"] = harmonic_mean(
+
+    # Compute GNN-ens ensemble score
+    scores["gnn_ens"] = harmonic_mean(
         [
             scores["predicted_dockq_1"],
             scores["predicted_dockq_2"],
-            scores["conf"],
-            scores["plddt_include_peptide_normalized"],
         ]
     )
 
-    scores.sort_values("quality_score", ascending=False, inplace=True)
+    # Compute GNN-AF consensus score
+    try:
+        af_scores = get_alphafold_rankings(run_dir)
+        af_scores = af_scores.merge(
+            get_plddts_for_run_dir(run_dir, chain_names), on="name"
+        )
+        scores = scores.merge(af_scores, on="name")
+        scores["gnn_af"] = harmonic_mean(
+            [
+                scores["predicted_dockq_1"],
+                scores["predicted_dockq_2"],
+                scores["conf"],
+                scores["cdr123_peptide_plddt"],
+            ]
+        )
+        scores.sort_values("gnn_af", ascending=False, inplace=True)
+    except FileNotFoundError:
+        print(
+            f"Could not find model_scores.txt for {run_dir}. Can only rerank based on GNN scores."
+        )
+        scores.sort_values("gnn_ens", ascending=False, inplace=True)
+
     scores.to_csv(run_dir / f"rescore_{name}.csv", index=False)
 
 
 @hydra.main(version_base=None, config_path="../config", config_name="config_rescore")
 def main(config: DictConfig):
+    torch.multiprocessing.set_start_method("spawn", force=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_list = []
     for model_config in config.ensemble:
@@ -127,6 +173,7 @@ def main(config: DictConfig):
                 num_workers=config.num_workers,
                 device=device,
                 name=config.name,
+                chain_names=config.chain_names,
             )
             OmegaConf.save(config, run_dir / f"rescore_config_{config.name}.yaml")
 
