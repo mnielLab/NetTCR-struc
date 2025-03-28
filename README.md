@@ -41,9 +41,9 @@ Additionally, we provide models trained on data excluding targets in docking sco
 
 ## Usage  
 
-### 1. Featurize Structural Models 
+### 1. Featurize structural models 
 
-Use `create_geometric_features.py` to extract geometric features from structural models. Specify chain names using `--chain_names` in the order: **TCRα, TCRβ, peptide, MHCa, MHCb**.  
+Use `create_geometric_features.py` to extract geometric features from structural models. Specify chain names using `--chain_names` in the order: TCRα, TCRβ, peptide, MHCa, MHCb.  
 
 ```bash
 python3 create_geometric_features.py -i <path_to_modeling_runs> -o <output_directory> -n 2 -d cuda --chain_names D E C A B
@@ -57,21 +57,21 @@ This generates three directories in the output directory:
 
 Use features from:  
 
-- `gvp` for **GVP-ens ensembles**  
-- `gvp_if1_embeddings` for **GVP-IF-ens ensembles**  
+- `gvp` for GVP-ens ensembles 
+- `gvp_if1_embeddings` for GVP-IF-ens ensembles
 
 ---
 
-### 2. Score Structural Models with a GNN Ensemble  
+### 2. Score structural models with a GNN ensemble  
 
-Run `rerank_docking_poses.py` to score models using a **GNN ensemble**. See `nettcrstruc/config/ensemble/` for available ensembles.
+Run `rerank_docking_poses.py` to score models using a GNN ensemble. See `nettcrstruc/config/ensemble/` for available ensembles.
 
 #### **Requirements:**  
 
-- Each **modeling run directory** must contain a `model_scores.txt` file with:  
-    - **name**: The PDB filename (without suffix)  
-    - **confidence**: AlphaFold confidence score  
-- Each `.pdb` file must include a **B-factor column** with per-residue **pLDDT scores**.  
+- Each modeling run directory must contain a `model_scores.txt` file with (if not provided, only the GNN-ens score will be computed):  
+    - name: PDB filenames (without suffix)  
+    - confidence: AlphaFold confidence scores  
+- Each `.pdb` file must include a B-factor column with per-residue pLDDT scores.
 - If chain names differ from `D, E, C, A, B`, specify them using `chain_names`.  
 
 ```bash
