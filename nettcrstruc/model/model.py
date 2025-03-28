@@ -8,7 +8,7 @@ class GVPMQA(nn.Module):
     """
     Modified from https://github.com/drorlab/gvp-pytorch/blob/main/gvp/models.py
 
-    GVP-GNN for Model Quality Assessment as described in manuscript.
+    GVP-GNN for DockQ regression as described in manuscript.
     """
 
     def __init__(
@@ -67,10 +67,6 @@ class GVPMQA(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        """
-        Args:
-            x: torch_geometric.data.Data or torch_geometric.data.Batch object with scalar/vector features.
-        """
         h_V = (x.node_s, x.node_v)
         h_E = (x.edge_s, x.edge_v)
 
