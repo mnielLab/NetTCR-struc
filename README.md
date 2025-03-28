@@ -82,9 +82,10 @@ python3 rerank_docking_poses.py input_dir=<path_to_modeling_runs> \
     chain_names=[D,E,C,A,B]
 ```
 
-This generates `rescore_{name}.csv` in each **modeling run directory** within `<input_dir>`, containing predicted model quality scores.  
+This generates `rescore_{name}.csv` in each modeling run directory within `<input_dir>`, containing predicted model quality scores.  
 
-- The **GNN-AF** or **GNN-IF1-AF** score (described in our manuscript) is stored in the `quality_score` column.
+- The **GNN-ens** or **GNN-IF1-ens** score (described in our manuscript) is stored in the `gnn_ens` column.
+- The **GNN-AF** or **GNN-IF1-AF** score (described in our manuscript) is stored in the `gnn_af` column.
 
 ## License
 
