@@ -23,22 +23,6 @@ Additionally, we provide models trained on data excluding targets in docking sco
 
 ## Installation
 
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/mnielLab/NetTCR-struc.git
-   ```
-2. Navigate to the project directory:
-
-   ```bash
-   cd NetTCR-struc
-   ```
-3. Install dependencies:
-
-   ```bash
-   conda env create -f environment.yml 
-   ```
-
 ## Usage  
 
 ### 1. Featurize structural models 
