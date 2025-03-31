@@ -1,12 +1,10 @@
 import concurrent.futures
-import json
 from pathlib import Path
 
 import biotite.structure as struc
 import biotite.structure.io as strucio
 import numpy as np
 import pandas as pd
-import torch
 from tqdm import tqdm
 
 from nettcrstruc.utils import pdb_utils

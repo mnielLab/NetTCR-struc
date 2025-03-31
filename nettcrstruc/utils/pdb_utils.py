@@ -6,7 +6,6 @@ import biotite.structure as struc
 import biotite.structure.io as strucio
 import numpy as np
 import pandas as pd
-from structure_pipeline.utils.sequence_utils import get_cdr_from_sequence
 from tqdm import tqdm
 
 
