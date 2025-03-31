@@ -23,20 +23,20 @@ Additionally, we provide models trained on data excluding targets in docking sco
 
 ## Installation
 
-1. Clone the repository:
-
    ```bash
-   git clone https://github.com/mnielLab/NetTCR-struc.git
-   ```
-2. Navigate to the project directory:
+   $ conda create -n nettcrstruc python=3.10
+   $ conda activate nettcrstruc
+   $ conda install pytorch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 pytorch-cuda=11.7 -c pytorch -c nvidia
+   $ conda install pyg pytorch-cluster pytorch-scatter -c pyg
+   $ pip install -r requirements.txt
+   $ conda install bioconda::anarci
 
-   ```bash
-   cd NetTCR-struc
-   ```
-3. Install dependencies:
+   # Install GVP for pytorch
+   export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True
+   pip install git+https://github.com/drorlab/gvp-pytorch
 
-   ```bash
-   conda env create -f environment.yml 
+   # Install NetTCR-struc
+   pip install git+https://github.com/mnielLab/NetTCR-struc.git
    ```
 
 ## Usage  
@@ -46,7 +46,7 @@ Additionally, we provide models trained on data excluding targets in docking sco
 Use `create_geometric_features.py` to extract geometric features from structural models. Specify chain names using `--chain_names` in the order: TCRα, TCRβ, peptide, MHCa, MHCb.  
 
 ```bash
-python3 create_geometric_features.py -i <path_to_modeling_runs> -o <output_directory> -n 2 -d cuda --chain_names D E C A B
+$ python3 create_geometric_features.py -i <path_to_modeling_runs> -o <output_directory> -n 2 -d cuda --chain_names D E C A B
 ```
 
 This generates three directories in the output directory:  
@@ -75,7 +75,7 @@ Run `rerank_docking_poses.py` to score models using a GNN ensemble. See `nettcrs
 - If chain names differ from `D, E, C, A, B`, specify them using `chain_names`.  
 
 ```bash
-python3 rerank_docking_poses.py input_dir=<path_to_modeling_runs> \
+$ python3 rerank_docking_poses.py input_dir=<path_to_modeling_runs> \
     processed_dir=<path_to_feature_directory> \
     name=<scoring_run_name> \
     ensemble=ensemble_binding_gvp_if1_ens \
