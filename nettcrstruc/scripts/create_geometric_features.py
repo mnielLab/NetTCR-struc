@@ -19,8 +19,8 @@ from nettcrstruc.dataset.processing import (
 from nettcrstruc.utils.utils import get_paths_from_dir
 import warnings
 
-# Suppress all UserWarnings
 warnings.filterwarnings("ignore", category=UserWarning)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -59,7 +59,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--chain_names",
-        type=list,
+        type=str,
         default=["D", "E", "C", "A", "B"],
         nargs="+",
     )
@@ -103,13 +103,12 @@ def process_entry(
     esm_if1_embeddings_dir = mk_feature_dir(pdb_path, out_dir / "esm_if1_embeddings")
     gvp_dir = mk_feature_dir(pdb_path, out_dir / "gvp")
     gvp_if1_dir = mk_feature_dir(pdb_path, out_dir / "gvp_if1_embeddings")
-
+    
     sequence, chain_id, backbone_coords, structure = extract_features_from_pdb(
         pdb_path,
         chain_names,
     )
-
-    # Skip processing if file exists and overwrite is False
+    
     file_name = f"{Path(pdb_path.stem)}.pt"
     esm_f1_features = get_esm_if1_features(
         structure=structure,
@@ -180,20 +179,20 @@ def main() -> None:
 
     batches = np.array_split(paths, args.num_workers)
 
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=args.num_workers
-    ) as executor:
-        future_to_batch = {
+    with concurrent.futures.ProcessPoolExecutor(max_workers=args.num_workers) as executor:
+        futures = [
             executor.submit(
                 process_batch,
                 batch,
                 args.out_dir,
                 args.device,
                 args.chain_names,
-            ): batch
+            )
             for batch in batches
-        }
+        ]
 
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
 
 if __name__ == "__main__":
     main()
