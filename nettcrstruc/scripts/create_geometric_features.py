@@ -17,7 +17,10 @@ from nettcrstruc.dataset.processing import (
     get_geometric_features,
 )
 from nettcrstruc.utils.utils import get_paths_from_dir
+import warnings
 
+# Suppress all UserWarnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
