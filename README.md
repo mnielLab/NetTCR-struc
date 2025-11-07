@@ -23,20 +23,20 @@ Additionally, we provide models trained on data excluding targets in docking sco
 
 ## Installation
 
+Run the following command to install the dependencies for NetTCR-struc.
+
    ```bash
-   $ conda create -n nettcrstruc python=3.10
-   $ conda activate nettcrstruc
-   $ conda install pytorch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 pytorch-cuda=11.7 -c pytorch -c nvidia
-   $ conda install pyg pytorch-cluster pytorch-scatter -c pyg
-   $ pip install -r requirements.txt
-   $ conda install bioconda::anarci
-
-   # Install GVP for pytorch
-   export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True
-   pip install git+https://github.com/drorlab/gvp-pytorch
-
-   # Install NetTCR-struc
-   pip install git+https://github.com/mnielLab/NetTCR-struc.git
+   conda create -n nettcrstruc python=3.10 -y && \
+   eval "$(conda shell.bash hook)" && \
+   conda activate nettcrstruc && \
+   conda install pytorch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 pytorch-cuda=11.7 mkl=2023.1.0 "numpy=1.24.*" -c pytorch -c nvidia -y && \
+   conda install pyg pytorch-cluster pytorch-scatter -c pyg -y && \
+   pip install -r requirements.txt && \
+   conda install bioconda::anarci -y && \
+   export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True && \
+   pip install git+https://github.com/drorlab/gvp-pytorch && \
+   pip install git+https://github.com/mnielLab/NetTCR-struc.git && \
+   python -c 'import torch; import torch_geometric; print("Installation successful"); print("PyTorch:", torch.__version__); print("PyTorch Geometric:", torch_geometric.__version__)'
    ```
 
 ## Usage  
