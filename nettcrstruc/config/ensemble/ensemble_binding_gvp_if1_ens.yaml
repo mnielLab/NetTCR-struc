@@ -20,13 +20,13 @@ model_9:
   state_dict: data/params/gvp_if1_ens_05_binding/model_4_4.pt
 
 defaults: 
-  - model@model_0: GVP
-  - model@model_1: GVP
-  - model@model_2: GVP
-  - model@model_3: GVP
-  - model@model_4: GVP
-  - model@model_5: GVP
-  - model@model_6: GVP
-  - model@model_7: GVP
-  - model@model_8: GVP
-  - model@model_9: GVP
+  - model@model_0: GVP_if1
+  - model@model_1: GVP_if1
+  - model@model_2: GVP_if1
+  - model@model_3: GVP_if1
+  - model@model_4: GVP_if1
+  - model@model_5: GVP_if1
+  - model@model_6: GVP_if1
+  - model@model_7: GVP_if1
+  - model@model_8: GVP_if1
+  - model@model_9: GVP_if1

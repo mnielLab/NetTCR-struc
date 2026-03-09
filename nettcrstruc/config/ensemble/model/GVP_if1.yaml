@@ -1,6 +1,6 @@
 model:
     _target_: nettcrstruc.model.model.GVPMQA
-    node_in_dim: [30, 3]
+    node_in_dim: [542, 3]
     node_h_dim: [50, 8]
     edge_in_dim: [32, 1]
     edge_h_dim: [50, 8]
