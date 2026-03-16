@@ -1,5 +1,6 @@
 import argparse
 import concurrent.futures
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,6 @@ from nettcrstruc.dataset.processing import (
     get_geometric_features,
 )
 from nettcrstruc.utils.utils import get_paths_from_dir
-import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -103,12 +103,12 @@ def process_entry(
     esm_if1_embeddings_dir = mk_feature_dir(pdb_path, out_dir / "esm_if1_embeddings")
     gvp_dir = mk_feature_dir(pdb_path, out_dir / "gvp")
     gvp_if1_dir = mk_feature_dir(pdb_path, out_dir / "gvp_if1_embeddings")
-    
+
     sequence, chain_id, backbone_coords, structure = extract_features_from_pdb(
         pdb_path,
         chain_names,
     )
-    
+
     file_name = f"{Path(pdb_path.stem)}.pt"
     esm_f1_features = get_esm_if1_features(
         structure=structure,
@@ -169,6 +169,7 @@ def process_batch(
 
 
 def main() -> None:
+    torch.multiprocessing.set_start_method("spawn", force=True)
     args = parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -179,7 +180,9 @@ def main() -> None:
 
     batches = np.array_split(paths, args.num_workers)
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=args.num_workers) as executor:
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=args.num_workers
+    ) as executor:
         futures = [
             executor.submit(
                 process_batch,
@@ -193,6 +196,7 @@ def main() -> None:
 
         for future in concurrent.futures.as_completed(futures):
             future.result()
+
 
 if __name__ == "__main__":
     main()
