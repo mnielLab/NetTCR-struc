@@ -29,42 +29,6 @@ def get_alphafold_rankings(run_dir: Path) -> None:
     return metrics
 
 
-def filter_clashes(df, max_tra_clashes=5, max_trb_clashes=5):
-    """Filter structures based on TCR-peptide clashes.
-
-    Args:
-        df (pd.DataFrame): DataFrame with paths for TCR-pMHC structural models.
-        max_tra_clashes (int): Maximum number of TRA clashes allowed.
-        max_trb_clashes (int): Maximum number of TRB clashes allowed.
-    """
-    paths = df["path"].tolist()
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        results = list(
-            tqdm(
-                executor.map(get_tcr_peptide_clashes_for_structure, paths),
-                total=len(paths),
-            )
-        )
-
-    TRA_clashes, TRB_clashes = zip(*results)
-    df["TRA_clashes"] = TRA_clashes
-    df["TRB_clashes"] = TRB_clashes
-
-    # Filter away structures with more than 5 clashes in either chain
-    df = df[
-        (df["TRA_clashes"] <= max_tra_clashes) & (df["TRB_clashes"] <= max_trb_clashes)
-    ]
-
-    # Rerank poses in cases of structures dropped by clashes
-    df["rerank_combined"] = (
-        df.groupby("pdb_id")["rerank_combined"].rank(ascending=True) - 1
-    ).astype(int)
-    df["rerank"] = (df.groupby("pdb_id")["rerank"].rank(ascending=True) - 1).astype(int)
-    df["rank"] = (df.groupby("pdb_id")["rank"].rank(ascending=True) - 1).astype(int)
-
-    return df
-
-
 def harmonic_mean(series: list):
     """
     Calculate the harmonic mean of a row-wise operation across multiple pandas Series.

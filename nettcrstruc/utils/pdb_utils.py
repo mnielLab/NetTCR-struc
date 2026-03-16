@@ -158,7 +158,7 @@ def merge_mhc_chains(structure: struc.AtomArray) -> struc.AtomArray:
     return structure
 
 
-def get_clashes(
+def get_interchain_chain_clashes(
     structure: struc.AtomArray,
     chain1_id: str,
     chain2_id: str,
@@ -219,17 +219,24 @@ def get_tcr_peptide_clashes_for_structure(
         tuple: The number of clashes between the peptide and TRA and TRB.
     """
     structure = strucio.load_structure(path)
-    TRA_clashes = get_clashes(structure, peptide_chain, tra_chain)
-    TRB_clashes = get_clashes(structure, peptide_chain, trb_chain)
+    TRA_clashes = get_interchain_chain_clashes(structure, peptide_chain, tra_chain)
+    TRB_clashes = get_interchain_chain_clashes(structure, peptide_chain, trb_chain)
     return TRA_clashes, TRB_clashes
 
 
-def filter_clashes(
+def get_clashes(
     df: pd.DataFrame,
-    max_tra_clashes: int = 5,
-    max_trb_clashes: int = 5,
     max_workers: int = 8,
 ) -> pd.DataFrame:
+    """Compute TRA/TRB clash counts for structures in a dataframe.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing a ``path`` column with structure paths.
+        max_workers (int): Number of processes for parallel clash computation.
+
+    Returns:
+        pd.DataFrame: Input dataframe with ``TRA_clashes`` and ``TRB_clashes`` columns.
+    """
     paths = df["path"].tolist()
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         results = list(
@@ -242,9 +249,4 @@ def filter_clashes(
     TRA_clashes, TRB_clashes = zip(*results)
     df["TRA_clashes"] = TRA_clashes
     df["TRB_clashes"] = TRB_clashes
-
-    # Filter away structures with more than 5 clashes in either chain
-    df = df[
-        (df["TRA_clashes"] <= max_tra_clashes) & (df["TRB_clashes"] <= max_trb_clashes)
-    ]
     return df

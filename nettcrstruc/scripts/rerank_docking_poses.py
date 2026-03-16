@@ -9,6 +9,7 @@ from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
 from nettcrstruc.dataset.dataset import MQAInferenceDataset
+from nettcrstruc.utils.pdb_utils import get_clashes
 from nettcrstruc.utils.scoring_utils import (
     get_alphafold_rankings,
     get_plddts_for_run_dir,
@@ -144,6 +145,10 @@ def rerank_candidates(
             f"Could not find model_scores.txt for {run_dir}. Can only rerank based on GNN scores."
         )
         scores.sort_values("gnn_ens", ascending=False, inplace=True)
+
+    scores = scores.reset_index(drop=True)
+    scores["path"] = scores["name"].apply(lambda stem: str(run_dir / f"{stem}.pdb"))
+    scores = get_clashes(scores, max_workers=num_workers)
 
     scores.to_csv(run_dir / f"rescore_{name}.csv", index=False)
 
