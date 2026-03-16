@@ -47,20 +47,20 @@ def harmonic_mean(series: list):
     return len(series) / np.sum(1.0 / data, axis=1)
 
 
-def compute_plddt_sum(
+def compute_plddt_mean(
     plddt: np.ndarray,
     indices: list,
     eps: float = 1e-6,
 ) -> float:
-    """Compute summed PLDDT for a CDR.
+    """Compute mean PLDDT for a set of indices.
 
     Args:
         plddt (np.ndarray): PLDDT scores.
-        indices (list): List of lists with CDR indices.
+        indices (list): List of lists with indices.
         eps (float): Epsilon value to prevent division by zero.
 
     Returns:
-        float: Summed PLDDT scores.
+        float: Mean PLDDT scores.
     """
     indices = np.concatenate(indices)
     return ((plddt[indices].sum() + eps) / len(indices)) * 0.01
@@ -74,7 +74,6 @@ def get_plddt_score(
     b1: str,
     b2: str,
     b3: str,
-    top_k: int,
     include_peptide: bool = False,
     chain_names: list = ["D", "E", "C", "A"],
 ) -> list:
@@ -88,8 +87,6 @@ def get_plddt_score(
         b1: string for CDR1b sequence.
         b2: string for CDR2b sequence.
         b3: string for CDR3b sequence.
-        top_k: Number of top models to consider.
-        normalize_on_length: Normalize on the number of residues.
         include_peptide: Include peptide residues in the calculation.
         chain_names: List of chain names in the PDB file in the order TCRa, TCRb, peptide, MHC.
 
@@ -97,9 +94,6 @@ def get_plddt_score(
     Returns:
         list: List of PLDDT scores.
     """
-    if top_k > 1:
-        raise NotImplementedError("Top k > 1 not implemented for PLDDT scoring.")
-
     structure = structure[structure.atom_name == "CA"]
 
     # Get peptide indices
@@ -124,8 +118,8 @@ def get_plddt_score(
         tra_peptide_indices = []
         trb_peptide_indices = []
 
-    # Compute log prob sums for all CDRs
-    plddt_sum = compute_plddt_sum(
+    # Get mean plddts for all included indices
+    plddt_sum = compute_plddt_mean(
         plddt=np.concatenate(
             [
                 structure[structure.chain_id == chain_names[0]].b_factor,
@@ -139,7 +133,7 @@ def get_plddt_score(
             a3,
         )
         + tra_peptide_indices,
-    ) + compute_plddt_sum(
+    ) + compute_plddt_mean(
         plddt=np.concatenate(
             [
                 structure[structure.chain_id == chain_names[1]].b_factor,
@@ -159,14 +153,12 @@ def get_plddt_score(
 
 def get_plddt_scores(
     df: pd.DataFrame,
-    top_k: int,
     chain_names: list = ["D", "E", "C", "A"],
 ) -> pd.DataFrame:
     """Get PLDDT scores for a dataframe of TCRs.
 
     Args:
         df (pd.DataFrame): DataFrame with paths and CDR sequences.
-        top_k (int): Number of top models to consider.
         chain_names (list): List of chain names in the PDB file in the order TCRa, TCRb, peptide, MHC.
 
     Returns:
@@ -188,7 +180,6 @@ def get_plddt_scores(
                 b1,
                 b2,
                 b3,
-                top_k,
                 include_peptide=False,
                 chain_names=chain_names,
             )
@@ -202,7 +193,6 @@ def get_plddt_scores(
                 b1,
                 b2,
                 b3,
-                top_k,
                 include_peptide=True,
                 chain_names=chain_names,
             )
@@ -261,7 +251,7 @@ def get_plddts_for_run_dir(
     df[["A1", "A2", "A3", "B1", "B2", "B3"]] = cdrs
 
     # Compute pLDDT scores
-    df = get_plddt_scores(df.copy(deep=True), 1, chain_names)
+    df = get_plddt_scores(df.copy(deep=True), chain_names)
 
     # Save results
     df["name"] = df["path"].apply(lambda x: Path(x).stem)
