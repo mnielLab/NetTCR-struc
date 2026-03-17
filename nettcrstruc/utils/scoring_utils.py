@@ -17,14 +17,19 @@ def get_alphafold_rankings(run_dir: Path) -> None:
     metrics = pd.read_csv(
         run_dir / "model_scores.txt",
         sep="\t",
-        names=["name", "conf"],
+        names=["name", "confidence"],
     )
     if metrics.isnull().values.any():
         metrics = pd.read_csv(
             run_dir / "model_scores.txt",
             sep=",",
-            names=["name", "conf"],
+            names=["name", "confidence"],
         )
+
+    # Check if header is present and remove if so
+    if metrics["confidence"].dtype == object:
+        metrics = metrics.iloc[1:]
+        metrics["confidence"] = metrics["confidence"].astype(float)
 
     return metrics
 

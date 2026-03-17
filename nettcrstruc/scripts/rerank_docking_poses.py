@@ -135,7 +135,7 @@ def rerank_candidates(
             [
                 scores["predicted_dockq_1"],
                 scores["predicted_dockq_2"],
-                scores["conf"],
+                scores["confidence"],
                 scores["cdr123_peptide_plddt"],
             ]
         )
