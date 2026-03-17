@@ -43,7 +43,7 @@ Run the following command to install the dependencies for NetTCR-struc.
 
 ### 1. Featurize structural models 
 
-Use `create_geometric_features.py` to extract geometric features from structural models. Specify chain names using `--chain_names` in the order: TCRα, TCRβ, peptide, MHCa, MHCb.  
+Use `create_geometric_features.py` to extract geometric features from structural models. Specify chain names using `--chain_names` in the order: TCRα, TCRβ, peptide, MHCa, (MHCb). In class I complexes, the MHCb chain name will be ignored. 
 
 ```bash
 $ python3 create_geometric_features.py -i <path_to_modeling_runs> -o <output_directory> -n 2 -d cuda --chain_names D E C A B
@@ -72,7 +72,7 @@ Run `rerank_docking_poses.py` to score models using a GNN ensemble. See `nettcrs
     - name: PDB filenames (without suffix)  
     - confidence: AlphaFold confidence scores  
 - Each `.pdb` file must include a B-factor column with per-residue pLDDT scores.
-- If chain names differ from `D, E, C, A, B`, specify them using `chain_names`.  
+- If chain names differ from `D, E, C, A, B`, specify them using `chain_names`. 
 
 ```bash
 $ python3 rerank_docking_poses.py input_dir=<path_to_modeling_runs> \

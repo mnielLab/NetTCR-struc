@@ -27,8 +27,6 @@ def compute_esm_if1_on_pdb(
     Returns:
         A tuple containing lists of tensor encodings, probabilities, and corresponding sequences for the PDB.
     """
-    esmif1_encs, esmif1_probs, sequence_order, chain_order = [], [], [], []
-
     # load pdb structure into coordinates
     esm_if1_loaded_structure = esm.inverse_folding.util.load_structure(
         str(pdb_path), chain_names
@@ -40,6 +38,8 @@ def compute_esm_if1_on_pdb(
         esm_if1_loaded_structure
     )
     # extract esm_if1 encodings and probabilities
+
+    esm_if1_output = {}
     for c in chain_names:
         seq = native_seqs[c]
         esmif1_e, esmif1_p = forward_pass(
@@ -49,14 +49,13 @@ def compute_esm_if1_on_pdb(
             chain=c,
             seq=seq,
         )
+        esm_if1_output[c] = {
+            "encoding": esmif1_e.cpu().detach(),
+            "probability": esmif1_p.cpu().detach(),
+            "sequence": seq,
+        }
 
-        # append encodings, probalities and sequence string.
-        esmif1_encs.append(esmif1_e)
-        esmif1_probs.append(esmif1_p)
-        sequence_order.append(seq)
-        chain_order.append(c)
-
-    return esmif1_encs, esmif1_probs, sequence_order, chain_order
+    return esm_if1_output
 
 
 def forward_pass(
@@ -155,27 +154,20 @@ def generate_esm_f1_features(
         A dict with ESM-IF1 features for a structure.
     """
     # Process each row here and append the result
-    esmif1_encs, esmif1_probs, sequence_order, chain_order = compute_esm_if1_on_pdb(
+    esm_if1_output = compute_esm_if1_on_pdb(
         pdb_path=pdb_path,
         esm_if1_model=esm_if1_model,
         alphabet=alphabet,
         chain_names=chain_names,
     )
-    data = {
-        "encoding": esmif1_encs,
-        "probabilities": esmif1_probs,
-        "sequence_order": sequence_order,
-        "chain_order": chain_order,
-    }
-    torch.save(data, output_path)
-    return data
+    torch.save(esm_if1_output, output_path)
+    return esm_if1_output
 
 
 def get_esm_if1_features(
     feature_path: Path,
     pdb_path: Path,
-    chain_id: np.ndarray,
-    structure: struc.AtomArray,
+    chain_names: np.ndarray,
     esm_if1_model: Any,
     alphabet: Any,
     device: str,
@@ -194,25 +186,19 @@ def get_esm_if1_features(
     Returns:
         A tensor of ESM-IF1 representations.
     """
-    _, idx = np.unique(chain_id, return_index=True)
-    unique_chain_id = chain_id[np.sort(idx)]
     if feature_path.exists():
         features = torch.load(feature_path, map_location=torch.device(device))
     else:
         features = generate_esm_f1_features(
             pdb_path=pdb_path,
             output_path=feature_path,
-            chain_names=unique_chain_id.tolist(),
+            chain_names=chain_names,
             esm_if1_model=esm_if1_model,
             alphabet=alphabet,
         )
 
     encodings = []
-    for chain in unique_chain_id:
-        sequence = get_sequence_from_chain(structure, chain)
-        # Get the index of the chain in the esm_if1_features
-        chain_idx = np.where(np.array(features["sequence_order"]) == sequence)[0][0]
-
-        encodings.append(features["encoding"][chain_idx].cpu().detach())
+    for chain in chain_names:
+        encodings.append(features[chain]["encoding"].cpu().detach())
 
     return torch.from_numpy(np.concatenate(encodings, axis=0)).to(device)

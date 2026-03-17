@@ -15,14 +15,14 @@ from nettcrstruc.utils import pdb_utils
 
 def extract_features_from_pdb(
     pdb_path: Path,
-    chain_names: list = ["D", "E", "C", "A", "B"],
-    chain_order=["D", "E", "C", "A"],
+    original_chain_names: list = ["D", "E", "C", "A", "B"],
+    chain_order=["D", "E", "C", "A", "B"],
 ) -> tuple:
     """Extracts relevant information from a PDB file for graph featurization.
 
     Args:
         pdb_path: Path to PDB file.
-        chain_names: Chain names in the PDB file in the order TCRa, TCRb, peptide, MHCa, MHCb.
+        original_chain_names: Original chain names in the PDB file in the order TCRa, TCRb, peptide, MHCa, MHCb.
         chain_order: Order that chains of structure should appear in.
 
     Returns:
@@ -33,9 +33,20 @@ def extract_features_from_pdb(
     # Fetch structure data
     structure = strucio.load_structure(pdb_path, extra_fields=["b_factor"])
 
+    # Check if MHCb is present
+    if len(original_chain_names) == 5 and original_chain_names[4] not in np.unique(
+        structure.chain_id
+    ):
+        print(
+            f"Warning: MHC class II beta chain specified as {original_chain_names[4]} but not found in {pdb_path}. Assuming MHC class I."
+        )
+        original_chain_names = original_chain_names[:4]
+        chain_order = chain_order[:4]
+
     # Rename chains if needed
     structure = pdb_utils.rename_chains(
-        structure, {k: v for k, v in zip(chain_names, ["D", "E", "C", "A", "B"])}
+        structure,
+        {k: v for k, v in zip(original_chain_names, chain_order)},
     )
 
     # Merge MHC class II B chain to A
@@ -61,12 +72,7 @@ def extract_features_from_pdb(
         structure,
         pdb_utils.get_backbone_coords,
     )
-    return (
-        sequence,
-        chain_id,
-        backbone_coords,
-        structure,
-    )
+    return (sequence, chain_id, backbone_coords, original_chain_names)
 
 
 def get_geometric_features(

@@ -88,7 +88,7 @@ def process_entry(
     device: str,
     esm_if1_model: Any,
     alphabet: Any,
-    chain_names: list,
+    original_chain_names: list,
 ):
     """Process a single entry.
 
@@ -99,26 +99,29 @@ def process_entry(
         device: The device to use for computation.
         esm_if1_model: The ESM-IF1 model used for computation.
         alphabet: Alphabet for the ESM-IF1 model.
+        original_chain_names: The original chain names in the PDB file.
     """
     esm_if1_embeddings_dir = mk_feature_dir(pdb_path, out_dir / "esm_if1_embeddings")
     gvp_dir = mk_feature_dir(pdb_path, out_dir / "gvp")
     gvp_if1_dir = mk_feature_dir(pdb_path, out_dir / "gvp_if1_embeddings")
 
-    sequence, chain_id, backbone_coords, structure = extract_features_from_pdb(
-        pdb_path,
-        chain_names,
+    sequence, chain_id, backbone_coords, original_chain_names = (
+        extract_features_from_pdb(
+            pdb_path,
+            original_chain_names=original_chain_names,
+        )
     )
 
     file_name = f"{Path(pdb_path.stem)}.pt"
     esm_f1_features = get_esm_if1_features(
-        structure=structure,
         pdb_path=pdb_path,
-        chain_id=chain_id,
+        chain_names=original_chain_names,
         feature_path=esm_if1_embeddings_dir / file_name,
         esm_if1_model=esm_if1_model,
         alphabet=alphabet,
         device=device,
     )
+
     geoemtric_features = get_geometric_features(
         feature_path=gvp_dir / file_name,
         seq=sequence,
@@ -140,7 +143,7 @@ def process_batch(
     batch: list,
     out_dir: Path,
     device: str,
-    chain_names: list,
+    original_chain_names: list,
 ) -> str:
     """Process a batch of entries.
 
@@ -148,7 +151,7 @@ def process_batch(
         batch: A list of tuples with the name and path to the PDB file.
         out_dir: The output directory.
         device: The device to use for computation.
-        chain_names: list of chain identifiers, in the order TCRa, TCRb, peptide, MHCa, MHCb.
+        original_chain_names: list of chain identifiers, in the order TCRa, TCRb, peptide, MHCa, MHCb.
 
     Returns:
         A list of results from processing each row in the batch.
@@ -163,7 +166,7 @@ def process_batch(
             device=device,
             esm_if1_model=esm_if1_model,
             alphabet=alphabet,
-            chain_names=chain_names,
+            original_chain_names=original_chain_names,
         )
         results.append(result)
 
